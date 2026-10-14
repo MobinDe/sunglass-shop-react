@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Card from "./card";
+import FilterSidebar from "./FilterSidebar";
 import { useSearchParams } from "react-router-dom";
 
 const ProductList = () => {
@@ -8,7 +9,10 @@ const ProductList = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
+  // استیت فیلترهای انتخاب‌شده از سایدبار
+  const [selectedFilters, setSelectedFilters] = useState({});
+
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get("search") || "";
 
@@ -17,7 +21,6 @@ const ProductList = () => {
     axios
       .get("/glasses.json")
       .then((response) => {
-        console.log("✅ محصولات دریافت شد:", response.data);
         setProducts(response.data);
         setLoading(false);
       })
@@ -28,32 +31,41 @@ const ProductList = () => {
       });
   }, []);
 
-  // 2. فیلتر محصولات (با دیباگ)
+  // 2. اعمال همزمان جستجو و فیلترها
   useEffect(() => {
-    console.log("🔍 searchQuery =", `"${searchQuery}"`);
-    console.log("📦 products.length =", products.length);
+    if (products.length === 0) return;
 
-    if (products.length > 0) {
-      if (searchQuery.trim() === "") {
-        console.log("➡️ بدون جستجو، همه محصولات");
-        setFilteredProducts(products);
-      } else {
-        const lowerQuery = searchQuery.toLowerCase();
-        const filtered = products.filter((product) => {
-          // ترکیب title و name و description برای جستجو
-          const title = (product.title || product.name || "").toLowerCase();
-          const desc = (product.description || "").toLowerCase();
-          const match = title.includes(lowerQuery) || desc.includes(lowerQuery);
-          if (match) {
-            console.log("✔️ محصول منطبق:", product.title || product.name);
-          }
-          return match;
-        });
-        console.log("📋 تعداد محصولات فیلتر شده:", filtered.length);
-        setFilteredProducts(filtered);
-      }
+    let result = [...products];
+
+    // الف) فیلتر بر اساس جستجو
+    if (searchQuery.trim() !== "") {
+      const lowerQuery = searchQuery.toLowerCase();
+      result = result.filter((product) => {
+        const title = (product.title || product.name || "").toLowerCase();
+        const desc = (product.description || "").toLowerCase();
+        return title.includes(lowerQuery) || desc.includes(lowerQuery);
+      });
     }
-  }, [products, searchQuery]);
+
+    // ب) فیلتر بر اساس انتخاب‌های سایدبار
+    Object.entries(selectedFilters).forEach(([key, value]) => {
+      result = result.filter((product) => {
+        const productValue = product[key];
+        if (productValue == null) return false;
+
+        // اگر مقدار محصول آرایه بود (مثلاً یک محصول هم مردانه هم زنانه)
+        if (Array.isArray(productValue)) {
+          return productValue.some(
+            (v) => String(v).trim() === String(value).trim()
+          );
+        }
+        // مقایسه‌ی رشته‌ای ساده
+        return String(productValue).trim() === String(value).trim();
+      });
+    });
+
+    setFilteredProducts(result);
+  }, [products, searchQuery, selectedFilters]);
 
   if (loading) {
     return (
@@ -71,24 +83,35 @@ const ProductList = () => {
     );
   }
 
-  if (filteredProducts.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-xl text-gray-600">
-          {searchQuery
-            ? `محصولی برای "${searchQuery}" یافت نشد.`
-            : "هیچ محصولی یافت نشد."}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filteredProducts.map((product) => (
-          <Card key={product.id} product={product} />
-        ))}
+    <div dir="rtl" className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* سایدبار فیلتر */}
+        <aside className="w-full lg:w-1/4 xl:w-1/5 shrink-0">
+          <FilterSidebar
+            selectedFilters={selectedFilters}
+            onFilterChange={setSelectedFilters}
+          />
+        </aside>
+
+        {/* بخش محصولات */}
+        <main className="w-full lg:w-3/4 xl:w-4/5">
+          {filteredProducts.length === 0 ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="text-xl text-gray-600">
+                {searchQuery || Object.keys(selectedFilters).length > 0
+                  ? "محصولی با این فیلترها یافت نشد."
+                  : "هیچ محصولی یافت نشد."}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                <Card key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

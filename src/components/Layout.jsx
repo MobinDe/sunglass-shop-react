@@ -2,13 +2,19 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 import NavbarComponent from "./NavbarComponent";
-// import Footer from "./Footer"; // اگر فوتر دارید
+import Footer from "./Footer";
 
 const Layout = () => {
   return (
-    <div>
+    <div className="flex flex-col min-h-screen bg-black">
       <NavbarComponent />
-      <Outlet />
+
+      {/* محتوای اصلی صفحات */}
+      <main className="flex-1">
+        <Outlet />
+      </main>
+
+      <Footer />
     </div>
   );
 };
